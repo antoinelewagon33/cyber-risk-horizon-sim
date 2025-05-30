@@ -1,73 +1,152 @@
-# Welcome to your Lovable project
 
-## Project info
+# CyberRisk Simulator
 
-**URL**: https://lovable.dev/projects/fe51d9e3-6afc-46f9-826d-b5fa60df5e46
+A modern web application for simulating cyber attack scenarios and assessing their business impact. Built as an educational tool for students to understand cybersecurity risks and their financial implications.
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- **Interactive Dashboard**: Modern dark theme with neon accents and cybersecurity-inspired design
+- **Scenario Selection**: Multiple cyber attack scenarios (ransomware, data breach, phishing, DDoS, etc.)
+- **Risk Assessment**: Calculate financial, operational, and reputational impact
+- **Simulation History**: Track and visualize past simulations with charts
+- **Responsive Design**: Works seamlessly on desktop and mobile devices
+- **Data Persistence**: Local storage with Firebase integration support
 
-**Use Lovable**
+## Available Scenarios
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/fe51d9e3-6afc-46f9-826d-b5fa60df5e46) and start prompting.
+1. **Ransomware Attack** - Malicious software encrypts critical systems
+2. **Data Breach** - Unauthorized access to sensitive data
+3. **Phishing Campaign** - Social engineering targeting employee credentials
+4. **DDoS Attack** - Distributed denial of service overwhelming infrastructure
+5. **Insider Threat** - Malicious or negligent actions by internal personnel
+6. **Supply Chain Attack** - Compromise through third-party vendors
 
-Changes made via Lovable will be committed automatically to this repo.
+## Technology Stack
 
-**Use your preferred IDE**
+- **Frontend**: React + TypeScript + Vite
+- **Styling**: Tailwind CSS with custom cyber theme
+- **UI Components**: shadcn/ui
+- **Charts**: Recharts
+- **State Management**: React hooks
+- **Data Storage**: localStorage (Firebase ready)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Getting Started
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Prerequisites
 
-Follow these steps:
+- Node.js 16+ and npm
+- Modern web browser
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Installation
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd cyberrisk-simulator
+```
 
-# Step 3: Install the necessary dependencies.
-npm i
+2. Install dependencies:
+```bash
+npm install
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+3. Start the development server:
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+4. Open your browser to `http://localhost:8080`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Firebase Integration (Optional)
 
-**Use GitHub Codespaces**
+To enable cloud storage with Firebase:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+1. Create a Firebase project at https://console.firebase.google.com
+2. Enable Firestore Database
+3. Update `src/utils/firestore.ts` with your Firebase configuration
+4. Uncomment the Firebase implementation in the firestore utility
 
-## What technologies are used for this project?
+## Project Structure
 
-This project is built with:
+```
+src/
+├── components/          # React components
+│   ├── ScenarioSelector.tsx
+│   ├── SimulationForm.tsx
+│   ├── ResultsDisplay.tsx
+│   └── SimulationHistory.tsx
+├── types/              # TypeScript type definitions
+│   └── simulation.ts
+├── utils/              # Utility functions
+│   ├── riskCalculations.ts
+│   └── firestore.ts
+├── pages/              # Page components
+│   └── Index.tsx
+└── hooks/              # Custom React hooks
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Risk Calculation Logic
 
-## How can I deploy this project?
+The application uses realistic business impact calculations based on:
 
-Simply open [Lovable](https://lovable.dev/projects/fe51d9e3-6afc-46f9-826d-b5fa60df5e46) and click on Share -> Publish.
+- **Financial Impact**: Direct losses, operational costs, regulatory fines
+- **Operational Impact**: Downtime, affected systems, recovery time  
+- **Reputational Impact**: Brand damage, customer trust, recovery timeline
+- **Risk Factors**: Industry type, company size, security posture
 
-## Can I connect a custom domain to my Lovable project?
+### Scenario Multipliers
 
-Yes, you can!
+Each scenario has different impact characteristics:
+- Ransomware: High financial impact, extended downtime
+- Data Breach: Regulatory compliance issues, reputation damage
+- Phishing: Variable impact based on success rate
+- DDoS: Primarily operational, shorter recovery time
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Educational Value
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+This simulator helps students understand:
+
+- Real-world financial impact of cyber attacks
+- Importance of incident response planning
+- Value of cybersecurity investments
+- Risk assessment methodologies
+- Business continuity considerations
+
+## Customization
+
+### Adding New Scenarios
+
+1. Update scenario configurations in `src/utils/riskCalculations.ts`
+2. Add scenario to the selector in `src/components/ScenarioSelector.tsx`
+3. Update type definitions if needed
+
+### Modifying Risk Calculations
+
+Edit the calculation logic in `src/utils/riskCalculations.ts`:
+- Adjust base impact multipliers
+- Modify downtime calculations
+- Update recommendation algorithms
+
+### Styling Changes
+
+The application uses a custom cyber theme defined in:
+- `tailwind.config.ts` - Color palette and animations
+- `src/index.css` - CSS custom properties and utilities
+
+## Contributing
+
+This is an educational project. To contribute:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## License
+
+This project is intended for educational use. Please check with your institution regarding usage and distribution.
+
+## Disclaimer
+
+This simulator is for educational purposes only. Risk calculations are simplified models and should not be used for actual business risk assessment or insurance purposes.
