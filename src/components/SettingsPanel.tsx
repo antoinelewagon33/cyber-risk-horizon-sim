@@ -7,7 +7,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { Moon, Sun, Translate } from 'lucide-react';
+import { Moon, Sun, Languages } from 'lucide-react';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useTranslation } from '@/utils/translations';
 
@@ -39,7 +39,7 @@ const SettingsPanel = () => {
             size="sm"
             className="border-cyber-purple/30 hover:border-cyber-purple/60"
           >
-            <Translate className="h-4 w-4 text-cyber-purple mr-1" />
+            <Languages className="h-4 w-4 text-cyber-purple mr-1" />
             {language.toUpperCase()}
           </Button>
         </DropdownMenuTrigger>
