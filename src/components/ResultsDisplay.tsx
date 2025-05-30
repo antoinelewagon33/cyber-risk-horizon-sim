@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +14,9 @@ import {
   Shield
 } from 'lucide-react';
 import { SimulationResult } from '@/types/simulation';
+import { useSettings } from '@/contexts/SettingsContext';
+import { useTranslation } from '@/utils/translations';
+import { formatCurrency } from '@/utils/currency';
 
 interface ResultsDisplayProps {
   result: SimulationResult;
@@ -23,13 +25,11 @@ interface ResultsDisplayProps {
 }
 
 const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, onNewSimulation, onViewHistory }) => {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const { language, currency } = useSettings();
+  const { t } = useTranslation(language);
+
+  const formatAmount = (amount: number) => {
+    return formatCurrency(amount, currency);
   };
 
   const getRiskColor = (level: string) => {
@@ -57,11 +57,11 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, onNewSimulation
       {/* Header */}
       <div className="text-center space-y-4">
         <h2 className="text-3xl font-bold text-white">
-          Risk Assessment Results
+          {t('riskAssessmentResults')}
         </h2>
         <p className="text-gray-400">
-          Scenario: <span className="text-cyber-blue">{result.scenario}</span> | 
-          Organization: <span className="text-cyber-blue">{result.organizationName}</span>
+          {t('scenario')}: <span className="text-cyber-blue">{t(result.scenario as keyof typeof import('@/utils/translations').translations.en)}</span> | 
+          {t('organization')}: <span className="text-cyber-blue">{result.organizationName}</span>
         </p>
         <div className="flex justify-center space-x-4">
           <Button
@@ -69,7 +69,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, onNewSimulation
             className="bg-cyber-blue hover:bg-cyber-blue/80 text-black font-semibold"
           >
             <RotateCcw className="h-4 w-4 mr-2" />
-            New Simulation
+            {t('newSimulation')}
           </Button>
           <Button
             variant="outline"
@@ -77,7 +77,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, onNewSimulation
             className="border-cyber-purple text-cyber-purple hover:bg-cyber-purple/10"
           >
             <History className="h-4 w-4 mr-2" />
-            View History
+            {t('viewHistory')}
           </Button>
         </div>
       </div>
@@ -87,7 +87,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, onNewSimulation
         <CardHeader className="text-center">
           <CardTitle className="flex items-center justify-center space-x-2">
             <Shield className="h-6 w-6 text-cyber-blue" />
-            <span className="text-2xl">Overall Risk Level</span>
+            <span className="text-2xl">{t('overallRiskLevel')}</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -96,7 +96,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, onNewSimulation
               variant="outline" 
               className={`text-2xl py-2 px-6 border-${getRiskColor(result.riskLevel)} text-${getRiskColor(result.riskLevel)}`}
             >
-              {result.riskLevel.toUpperCase()}
+              {t(result.riskLevel as keyof typeof import('@/utils/translations').translations.en)}
             </Badge>
           </div>
           <Progress 
@@ -118,28 +118,28 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, onNewSimulation
           <CardHeader>
             <CardTitle className="flex items-center text-cyber-red">
               <DollarSign className="h-5 w-5 mr-2" />
-              Financial Impact
+              {t('financialImpact')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-center">
               <div className="text-3xl font-bold text-cyber-red">
-                {formatCurrency(result.financialImpact.totalLoss)}
+                {formatAmount(result.financialImpact.totalLoss)}
               </div>
-              <p className="text-sm text-gray-400">Total Estimated Loss</p>
+              <p className="text-sm text-gray-400">{t('totalEstimatedLoss')}</p>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-sm text-gray-400">Direct Loss:</span>
-                <span className="text-white">{formatCurrency(result.financialImpact.directLoss)}</span>
+                <span className="text-sm text-gray-400">{t('directLoss')}:</span>
+                <span className="text-white">{formatAmount(result.financialImpact.directLoss)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-gray-400">Operational Loss:</span>
-                <span className="text-white">{formatCurrency(result.financialImpact.operationalLoss)}</span>
+                <span className="text-sm text-gray-400">{t('operationalLoss')}:</span>
+                <span className="text-white">{formatAmount(result.financialImpact.operationalLoss)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-gray-400">Regulatory Fines:</span>
-                <span className="text-white">{formatCurrency(result.financialImpact.regulatoryFines)}</span>
+                <span className="text-sm text-gray-400">{t('regulatoryFines')}:</span>
+                <span className="text-white">{formatAmount(result.financialImpact.regulatoryFines)}</span>
               </div>
             </div>
           </CardContent>
@@ -150,7 +150,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, onNewSimulation
           <CardHeader>
             <CardTitle className="flex items-center text-cyber-blue">
               <Clock className="h-5 w-5 mr-2" />
-              Operational Impact
+              {t('operationalImpact')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -158,15 +158,15 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, onNewSimulation
               <div className="text-3xl font-bold text-cyber-blue">
                 {result.operationalImpact.downtimeHours}h
               </div>
-              <p className="text-sm text-gray-400">Estimated Downtime</p>
+              <p className="text-sm text-gray-400">{t('estimatedDowntime')}</p>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-sm text-gray-400">Affected Systems:</span>
+                <span className="text-sm text-gray-400">{t('affectedSystems')}:</span>
                 <span className="text-white">{result.operationalImpact.affectedSystems}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-gray-400">Recovery Time:</span>
+                <span className="text-sm text-gray-400">{t('recoveryTime')}:</span>
                 <span className="text-white">{result.operationalImpact.recoveryTime}h</span>
               </div>
             </div>
@@ -178,7 +178,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, onNewSimulation
           <CardHeader>
             <CardTitle className="flex items-center text-cyber-purple">
               <TrendingDown className="h-5 w-5 mr-2" />
-              Reputational Impact
+              {t('reputationalImpact')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -186,12 +186,12 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, onNewSimulation
               <div className="text-3xl font-bold text-cyber-purple">
                 {result.reputationalImpact.score}/10
               </div>
-              <p className="text-sm text-gray-400">Impact Score</p>
+              <p className="text-sm text-gray-400">{t('impactScore')}</p>
             </div>
             <div className="space-y-2">
               <p className="text-sm text-gray-300">{result.reputationalImpact.description}</p>
               <div className="flex justify-between">
-                <span className="text-sm text-gray-400">Recovery Time:</span>
+                <span className="text-sm text-gray-400">{t('recoveryTime')}:</span>
                 <span className="text-white">{result.reputationalImpact.recoveryTime}</span>
               </div>
             </div>
@@ -204,10 +204,10 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, onNewSimulation
         <CardHeader>
           <CardTitle className="flex items-center text-cyber-green">
             <AlertTriangle className="h-5 w-5 mr-2" />
-            Security Recommendations
+            {t('securityRecommendations')}
           </CardTitle>
           <CardDescription>
-            Actionable steps to reduce your cyber risk exposure
+            {t('actionableSteps')}
           </CardDescription>
         </CardHeader>
         <CardContent>
