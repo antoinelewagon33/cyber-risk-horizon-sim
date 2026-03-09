@@ -150,6 +150,24 @@
   }
 }
 
+@keyframes attack-line-draw {
+  0% {
+    stroke-dashoffset: 1000;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-attack-line {
+  stroke-dasharray: 1000;
+  animation: attack-line-draw 1.5s ease-in-out forwards;
+}
+
+.pulse-attack-line {
+  animation: pulse-line 2s ease-in-out infinite;
+}
+
 .leaflet-container {
   background: #0a0a0f !important;
   font-family: inherit;
