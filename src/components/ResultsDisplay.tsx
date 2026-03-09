@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -17,6 +17,9 @@ import { SimulationResult } from '@/types/simulation';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useTranslation } from '@/utils/translations';
 import { formatCurrency } from '@/utils/currency';
+import ThreatFeed from './ThreatFeed';
+import ThreatMap from './ThreatMap';
+import { Threat, generateMockThreats } from '@/types/threat';
 
 interface ResultsDisplayProps {
   result: SimulationResult;
@@ -27,6 +30,14 @@ interface ResultsDisplayProps {
 const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, onNewSimulation, onViewHistory }) => {
   const { language, currency } = useSettings();
   const { t } = useTranslation(language);
+
+  // Generate mock threats for demonstration
+  const threats = useMemo(() => generateMockThreats(), []);
+  const [selectedThreatId, setSelectedThreatId] = useState<string | undefined>();
+
+  const handleThreatSelect = (threat: Threat) => {
+    setSelectedThreatId(threat.id);
+  };
 
   const formatAmount = (amount: number) => {
     return formatCurrency(amount, currency);
@@ -79,6 +90,24 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, onNewSimulation
             <History className="h-4 w-4 mr-2" />
             {t('viewHistory')}
           </Button>
+        </div>
+      </div>
+
+      {/* Threat Map and Feed Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <ThreatMap
+            threats={threats}
+            selectedThreatId={selectedThreatId}
+            onThreatSelect={handleThreatSelect}
+          />
+        </div>
+        <div className="lg:col-span-1">
+          <ThreatFeed
+            threats={threats}
+            selectedThreatId={selectedThreatId}
+            onThreatSelect={handleThreatSelect}
+          />
         </div>
       </div>
 
