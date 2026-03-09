@@ -71,6 +71,11 @@ interface AnimatedPing {
   duration: number
 }
 
+interface PingRef {
+  marker: any
+  ping: AnimatedPing
+}
+
 const SEVERITY_COLORS = {
   Critical: "#dc2626",
   High: "#ea580c",
@@ -107,21 +112,10 @@ export default function Component() {
   const pulseIndexRef = useRef(0)
   const mapRef = useRef<any>(null)
   const markersRef = useRef<any[]>([])
-  const pingsRef = useRef<any[]>([])
+  const pingsRef = useRef<PingRef[]>([])
 
   const mapWidth = 1200
   const mapHeight = 600
-
-  interface AnimatedLine {
-    id: string
-    polyline: any
-    severity: "Critical" | "High" | "Medium" | "Low"
-    startTime: number
-    createdAt: number
-  }
-
-  const animatedLinesRef = useRef<AnimatedLine[]>([])
-  const lineAnimationRef = useRef<number>()
 
   // Enhanced geographic locations with cities
   const attackSources = [
@@ -185,7 +179,6 @@ export default function Component() {
           zoom: 2,
           zoomControl: false,
           attributionControl: false,
-          preferCanvas: true,
         })
 
         // Add custom zoom controls
@@ -429,50 +422,37 @@ export default function Component() {
       }).addTo(mapRef.current)
 
       // Get SVG element from polyline for animation
-      const polylineElement = polyline._path as SVGPathElement
+      const path = polyline._path as SVGPathElement
 
-      if (polylineElement) {
+      if (path) {
         // Get path length for dashoffset animation
-        const pathLength = polylineElement.getTotalLength()
+        const length = path.getTotalLength()
 
-        // Set initial dashoffset to path length (line is invisible)
-        polylineElement.style.strokeDashoffset = `${pathLength}px`
-        polylineElement.style.transition = `stroke-dashoffset 1.5s ease-in-out`
+        // Set initial dasharray and dashoffset (line is invisible)
+        path.style.strokeDasharray = length + " " + length
+        path.style.strokeDashoffset = String(length)
+        
+        // Apply CSS transition
+        path.style.transition = "stroke-dashoffset 1.5s ease-in-out"
 
         // Trigger animation by setting dashoffset to 0
-        setTimeout(() => {
-          polylineElement.style.strokeDashoffset = "0px"
-        }, pulse.severity === "Medium" || pulse.severity === "Low" ? 2000 : 0)
+        requestAnimationFrame(() => {
+          path.style.strokeDashoffset = "0"
+        })
 
-        // After animation completes, start pulsing
+        // Remove line after animation completes
+        const animationDelay = pulse.severity === "Medium" || pulse.severity === "Low" ? 3500 : 1500
         setTimeout(
           () => {
-            // Add pulsing animation
-            const pulseAnimation = document.createElement("style")
-            const animId = `pulse-${Date.now()}-${Math.random()}`
-            pulseAnimation.textContent = `
-              #${animId} {
-                animation: line-pulse 1.5s ease-in-out infinite;
+            if (mapRef.current) {
+              try {
+                mapRef.current.removeLayer(polyline)
+              } catch (e) {
+                // Already removed
               }
-              @keyframes line-pulse {
-                0%, 100% { opacity: 0.4; stroke-width: 2px; }
-                50% { opacity: 0.8; stroke-width: 2.5px; }
-              }
-            `
-            document.head.appendChild(pulseAnimation)
-            polylineElement.id = animId
-
-            // Store the animation style for cleanup
-            const lineObj: AnimatedLine = {
-              id: pulse.id,
-              polyline,
-              severity: pulse.severity,
-              startTime: Date.now(),
-              createdAt: Date.now(),
             }
-            animatedLinesRef.current.push(lineObj)
           },
-          pulse.severity === "Medium" || pulse.severity === "Low" ? 3500 : 1500,
+          animationDelay,
         )
       }
     } catch (error) {
@@ -480,43 +460,7 @@ export default function Component() {
     }
   }
 
-  // Cleanup animated lines after 30 seconds and enforce max 20 lines
-  useEffect(() => {
-    if (!mapRef.current) return
 
-    const cleanupInterval = setInterval(() => {
-      const now = Date.now()
-      const maxLines = 20
-      const lineLifetime = 30000 // 30 seconds
-
-      // Remove expired lines
-      animatedLinesRef.current = animatedLinesRef.current.filter((line) => {
-        if (now - line.createdAt > lineLifetime) {
-          try {
-            mapRef.current.removeLayer(line.polyline)
-          } catch (e) {
-            console.error("Error removing polyline:", e)
-          }
-          return false
-        }
-        return true
-      })
-
-      // Remove oldest lines if we exceed max
-      while (animatedLinesRef.current.length > maxLines) {
-        const oldest = animatedLinesRef.current.shift()
-        if (oldest) {
-          try {
-            mapRef.current.removeLayer(oldest.polyline)
-          } catch (e) {
-            console.error("Error removing polyline:", e)
-          }
-        }
-      }
-    }, 1000)
-
-    return () => clearInterval(cleanupInterval)
-  }, [mapLoaded])
 
   // Add animated ping to map
   const addPingToMap = async (ping: AnimatedPing) => {
@@ -528,19 +472,6 @@ export default function Component() {
 
       // Trigger the Worms-style animated line
       await addAnimatedLineToMap(ping.pulse)
-
-      // Create animated polyline
-      const latlngs = [
-        [ping.pulse.source.lat, ping.pulse.source.lng],
-        [ping.pulse.target.lat, ping.pulse.target.lng],
-      ]
-
-      const polyline = L.polyline(latlngs as any, {
-        color: color,
-        weight: 3,
-        opacity: 0.8,
-        dashArray: "10, 10",
-      }).addTo(mapRef.current)
 
       // Create moving marker
       const movingIcon = L.divIcon({
@@ -602,8 +533,8 @@ export default function Component() {
         { className: "custom-popup" },
       )
 
-      // Store references for cleanup
-      pingsRef.current.push({ polyline, marker: movingMarker, ping })
+      // Store reference for cleanup
+      pingsRef.current.push({ marker: movingMarker, ping })
 
       // Animate the marker along the path
       const animateMarker = () => {
@@ -612,12 +543,12 @@ export default function Component() {
         const lng = ping.pulse.source.lng + (ping.pulse.target.lng - ping.pulse.source.lng) * progress
 
         movingMarker.setLatLng([lat, lng])
-        polyline.setStyle({ opacity: 0.8 - progress * 0.6 })
 
         if (progress >= 1) {
           // Remove from map when animation completes
-          mapRef.current.removeLayer(polyline)
-          mapRef.current.removeLayer(movingMarker)
+          if (mapRef.current) {
+            mapRef.current.removeLayer(movingMarker)
+          }
           pingsRef.current = pingsRef.current.filter((p) => p.ping.id !== ping.id)
         }
       }
@@ -730,7 +661,7 @@ export default function Component() {
   }
 
   return (
-    <div className="w-full min-h-screen bg-slate-950 text-white">
+    <div className="dark w-full min-h-screen bg-slate-950 text-white">
       {/* Professional Header */}
       <div className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-6 py-4">
@@ -805,7 +736,7 @@ export default function Component() {
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Enhanced Stats Dashboard */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-          <Card className="bg-slate-900/50 border-slate-700 backdrop-blur-sm">
+          <Card className="bg-slate-900 border-slate-700 backdrop-blur-sm">
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-blue-600/20 rounded-lg">
@@ -819,7 +750,7 @@ export default function Component() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-700 backdrop-blur-sm">
+          <Card className="bg-slate-900 border-slate-700 backdrop-blur-sm">
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-red-600/20 rounded-lg">
@@ -833,7 +764,7 @@ export default function Component() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-700 backdrop-blur-sm">
+          <Card className="bg-slate-900 border-slate-700 backdrop-blur-sm">
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-orange-600/20 rounded-lg">
@@ -847,7 +778,7 @@ export default function Component() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-700 backdrop-blur-sm">
+          <Card className="bg-slate-900 border-slate-700 backdrop-blur-sm">
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-yellow-600/20 rounded-lg">
@@ -861,7 +792,35 @@ export default function Component() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-700 backdrop-blur-sm">
+          <Card className="bg-slate-900 border-slate-700 backdrop-blur-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-green-600/20 rounded-lg">
+                  <Shield className="w-5 h-5 text-green-400" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-green-400">{stats.low}</div>
+                  <div className="text-xs text-slate-400 font-medium">Faible</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-900 border-slate-700 backdrop-blur-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-purple-600/20 rounded-lg">
+                  <Users className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-purple-400">{attackSources.length}</div>
+                  <div className="text-xs text-slate-400 font-medium">Sources Actives</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-900 border-slate-700 backdrop-blur-sm">
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-green-600/20 rounded-lg">
@@ -906,7 +865,7 @@ export default function Component() {
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Interactive Leaflet Map */}
-          <Card className="lg:col-span-3 bg-slate-900/50 border-slate-700 backdrop-blur-sm">
+          <Card className="lg:col-span-3 bg-slate-900 border-slate-700 backdrop-blur-sm">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg font-semibold text-white flex items-center space-x-2">
@@ -945,7 +904,7 @@ export default function Component() {
           </Card>
 
           {/* Enhanced Threat Feed */}
-          <Card className="bg-slate-900/50 border-slate-700 backdrop-blur-sm">
+          <Card className="bg-slate-900 border-slate-700 backdrop-blur-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg font-semibold text-white flex items-center space-x-2">
                 <Activity className="w-5 h-5" />
@@ -1031,7 +990,7 @@ export default function Component() {
         </div>
 
         {/* Enhanced Legend */}
-        <Card className="bg-slate-900/50 border-slate-700 backdrop-blur-sm">
+        <Card className="bg-slate-900 border-slate-700 backdrop-blur-sm">
           <CardContent className="p-6">
             <div className="flex flex-wrap items-center justify-between gap-8">
               <div className="flex flex-wrap items-center gap-8">
