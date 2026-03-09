@@ -112,6 +112,17 @@ export default function Component() {
   const mapWidth = 1200
   const mapHeight = 600
 
+  interface AnimatedLine {
+    id: string
+    polyline: any
+    severity: "Critical" | "High" | "Medium" | "Low"
+    startTime: number
+    createdAt: number
+  }
+
+  const animatedLinesRef = useRef<AnimatedLine[]>([])
+  const lineAnimationRef = useRef<number>()
+
   // Enhanced geographic locations with cities
   const attackSources = [
     { lat: 39.9042, lng: 116.4074, country: "China", city: "Beijing" },
@@ -390,6 +401,123 @@ export default function Component() {
     return "Suspicious Activity"
   }
 
+  // Add animated line with Worms-style drawing (stroke-dashoffset animation)
+  const addAnimatedLineToMap = async (pulse: ThreatPulse) => {
+    if (!mapRef.current || !mapLoaded) return
+
+    try {
+      const L = (await import("leaflet")).default
+      const colorMap: Record<string, string> = {
+        Critical: "#ef4444",
+        High: "#f97316",
+        Medium: "#eab308",
+        Low: "#22c55e",
+      }
+      const color = colorMap[pulse.severity]
+
+      // Create dotted polyline with dashed array
+      const latlngs = [
+        [pulse.source.lat, pulse.source.lng],
+        [pulse.target.lat, pulse.target.lng],
+      ]
+
+      const polyline = L.polyline(latlngs as any, {
+        color: color,
+        weight: 2,
+        opacity: 0.75,
+        dashArray: "6, 10",
+      }).addTo(mapRef.current)
+
+      // Get SVG element from polyline for animation
+      const polylineElement = polyline._path as SVGPathElement
+
+      if (polylineElement) {
+        // Get path length for dashoffset animation
+        const pathLength = polylineElement.getTotalLength()
+
+        // Set initial dashoffset to path length (line is invisible)
+        polylineElement.style.strokeDashoffset = `${pathLength}px`
+        polylineElement.style.transition = `stroke-dashoffset 1.5s ease-in-out`
+
+        // Trigger animation by setting dashoffset to 0
+        setTimeout(() => {
+          polylineElement.style.strokeDashoffset = "0px"
+        }, pulse.severity === "Medium" || pulse.severity === "Low" ? 2000 : 0)
+
+        // After animation completes, start pulsing
+        setTimeout(
+          () => {
+            // Add pulsing animation
+            const pulseAnimation = document.createElement("style")
+            const animId = `pulse-${Date.now()}-${Math.random()}`
+            pulseAnimation.textContent = `
+              #${animId} {
+                animation: line-pulse 1.5s ease-in-out infinite;
+              }
+              @keyframes line-pulse {
+                0%, 100% { opacity: 0.4; stroke-width: 2px; }
+                50% { opacity: 0.8; stroke-width: 2.5px; }
+              }
+            `
+            document.head.appendChild(pulseAnimation)
+            polylineElement.id = animId
+
+            // Store the animation style for cleanup
+            const lineObj: AnimatedLine = {
+              id: pulse.id,
+              polyline,
+              severity: pulse.severity,
+              startTime: Date.now(),
+              createdAt: Date.now(),
+            }
+            animatedLinesRef.current.push(lineObj)
+          },
+          pulse.severity === "Medium" || pulse.severity === "Low" ? 3500 : 1500,
+        )
+      }
+    } catch (error) {
+      console.error("Error adding animated line to map:", error)
+    }
+  }
+
+  // Cleanup animated lines after 30 seconds and enforce max 20 lines
+  useEffect(() => {
+    if (!mapRef.current) return
+
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now()
+      const maxLines = 20
+      const lineLifetime = 30000 // 30 seconds
+
+      // Remove expired lines
+      animatedLinesRef.current = animatedLinesRef.current.filter((line) => {
+        if (now - line.createdAt > lineLifetime) {
+          try {
+            mapRef.current.removeLayer(line.polyline)
+          } catch (e) {
+            console.error("Error removing polyline:", e)
+          }
+          return false
+        }
+        return true
+      })
+
+      // Remove oldest lines if we exceed max
+      while (animatedLinesRef.current.length > maxLines) {
+        const oldest = animatedLinesRef.current.shift()
+        if (oldest) {
+          try {
+            mapRef.current.removeLayer(oldest.polyline)
+          } catch (e) {
+            console.error("Error removing polyline:", e)
+          }
+        }
+      }
+    }, 1000)
+
+    return () => clearInterval(cleanupInterval)
+  }, [mapLoaded])
+
   // Add animated ping to map
   const addPingToMap = async (ping: AnimatedPing) => {
     if (!mapRef.current || !mapLoaded) return
@@ -397,6 +525,9 @@ export default function Component() {
     try {
       const L = (await import("leaflet")).default
       const color = SEVERITY_COLORS[ping.pulse.severity]
+
+      // Trigger the Worms-style animated line
+      await addAnimatedLineToMap(ping.pulse)
 
       // Create animated polyline
       const latlngs = [
@@ -823,65 +954,77 @@ export default function Component() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar">
-                {pulses.slice(0, 15).map((pulse) => (
-                  <div
-                    key={pulse.id}
-                    className="p-4 bg-slate-800/50 rounded-lg border border-slate-700/50 hover:border-slate-600 transition-colors cursor-pointer"
-                    onClick={() => setSelectedThreat(pulse)}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <Badge
-                        variant="outline"
-                        className="text-xs font-medium"
-                        style={{
-                          borderColor: SEVERITY_COLORS[pulse.severity],
-                          color: SEVERITY_COLORS[pulse.severity],
-                          backgroundColor: `${SEVERITY_COLORS[pulse.severity]}10`,
-                        }}
-                      >
-                        {pulse.severity}
-                      </Badge>
-                      <span className="text-xs text-slate-400">{pulse.timestamp.toLocaleTimeString()}</span>
-                    </div>
+                {pulses.slice(0, 15).map((pulse) => {
+                  const severityConfig: Record<string, { bgColor: string; textColor: string }> = {
+                    Critical: { bgColor: "#dc2626", textColor: "#ffffff" },
+                    High: { bgColor: "#ea580c", textColor: "#ffffff" },
+                    Medium: { bgColor: "#d97706", textColor: "#ffffff" },
+                    Low: { bgColor: "#16a34a", textColor: "#ffffff" },
+                  }
+                  const config = severityConfig[pulse.severity]
 
-                    <div className="text-sm font-medium mb-2 text-white line-clamp-2">{pulse.name}</div>
-                    <div className="text-xs text-slate-400 mb-3 line-clamp-2">{pulse.description}</div>
-
-                    <div className="flex items-center justify-between text-xs mb-2">
-                      <div className="flex items-center space-x-1">
-                        <span className="text-red-400">
-                          {pulse.source.city}, {pulse.source.country}
-                        </span>
-                        <span className="text-slate-500">→</span>
-                        <span className="text-green-400">
-                          {pulse.target.city}, {pulse.target.country}
-                        </span>
+                  return (
+                    <div
+                      key={pulse.id}
+                      className="p-4 bg-slate-900/60 rounded-lg border border-slate-700 hover:border-slate-600 transition-colors cursor-pointer"
+                      onClick={() => setSelectedThreat(pulse)}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <Badge
+                          className="text-xs font-medium text-white"
+                          style={{
+                            backgroundColor: config.bgColor,
+                            color: config.textColor,
+                          }}
+                        >
+                          {pulse.severity === "Critical"
+                            ? "Critique"
+                            : pulse.severity === "High"
+                              ? "Élevé"
+                              : pulse.severity === "Medium"
+                                ? "Moyen"
+                                : "Faible"}
+                        </Badge>
+                        <span className="text-xs text-gray-200">{pulse.timestamp.toLocaleTimeString()}</span>
                       </div>
-                    </div>
 
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500">{pulse.indicators} indicateurs</span>
-                      <span className="text-slate-500">par {pulse.author}</span>
-                    </div>
+                      <div className="text-sm font-medium mb-2 text-white line-clamp-2">{pulse.name}</div>
+                      <div className="text-xs text-gray-200 mb-3 line-clamp-2">{pulse.description}</div>
 
-                    {pulse.adversary && pulse.adversary !== "Unknown" && (
-                      <div className="text-xs text-orange-400 mt-2 font-medium">Adversaire: {pulse.adversary}</div>
-                    )}
-
-                    {pulse.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {pulse.tags.slice(0, 3).map((tag, index) => (
-                          <span key={index} className="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded">
-                            {tag}
+                      <div className="flex items-center justify-between text-xs mb-2">
+                        <div className="flex items-center space-x-1">
+                          <span className="text-red-400 font-mono text-gray-300">
+                            {pulse.source.city}, {pulse.source.country}
                           </span>
-                        ))}
-                        {pulse.tags.length > 3 && (
-                          <span className="text-xs text-slate-500">+{pulse.tags.length - 3}</span>
-                        )}
+                          <span className="text-slate-500">→</span>
+                          <span className="text-green-400 text-gray-200">
+                            {pulse.target.city}, {pulse.target.country}
+                          </span>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                ))}
+
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-300">{pulse.indicators} indicateurs</span>
+                        <span className="text-gray-300">par {pulse.author}</span>
+                      </div>
+
+                      {pulse.adversary && pulse.adversary !== "Unknown" && (
+                        <div className="text-xs text-orange-400 mt-2 font-medium">Adversaire: {pulse.adversary}</div>
+                      )}
+
+                      {pulse.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {pulse.tags.slice(0, 3).map((tag, index) => (
+                            <span key={index} className="text-xs bg-slate-700 text-gray-100 px-2 py-1 rounded">
+                              {tag}
+                            </span>
+                          ))}
+                          {pulse.tags.length > 3 && <span className="text-xs text-gray-300">+{pulse.tags.length - 3}</span>}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </CardContent>
           </Card>
@@ -889,9 +1032,9 @@ export default function Component() {
 
         {/* Enhanced Legend */}
         <Card className="bg-slate-900/50 border-slate-700 backdrop-blur-sm">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap items-center justify-between gap-6">
-              <div className="flex flex-wrap items-center gap-6">
+          <CardContent className="p-6">
+            <div className="flex flex-wrap items-center justify-between gap-8">
+              <div className="flex flex-wrap items-center gap-8">
                 <div className="flex items-center space-x-2">
                   <div className="w-4 h-4 bg-green-500 rounded-full shadow-lg shadow-green-500/30"></div>
                   <span className="text-sm font-medium text-white">Honeypots & Systèmes de Défense</span>
@@ -922,7 +1065,7 @@ export default function Component() {
                   </div>
                 ))}
               </div>
-              <div className="text-xs text-slate-300">
+              <div className="text-xs text-gray-200 whitespace-nowrap">
                 Propulsé par AlienVault OTX • Intelligence des Menaces en Temps Réel • Leaflet Maps
               </div>
             </div>
