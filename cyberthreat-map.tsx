@@ -233,7 +233,7 @@ export default function Component() {
           })
             .bindPopup(
               `
-              <div style="color: #000; font-family: system-ui;">
+              <div style="font-family: system-ui;">
                 <strong>🛡️ Honeypot</strong><br>
                 <strong>${honeypot.city}, ${honeypot.country}</strong><br>
                 <small>Defense System Active</small>
@@ -253,7 +253,7 @@ export default function Component() {
           })
             .bindPopup(
               `
-              <div style="color: #000; font-family: system-ui;">
+              <div style="font-family: system-ui;">
                 <strong>⚠️ Attack Source</strong><br>
                 <strong>${source.city}, ${source.country}</strong><br>
                 <small>Threat Origin Detected</small>
@@ -274,7 +274,7 @@ export default function Component() {
         style.textContent = `
           .custom-popup .leaflet-popup-content-wrapper {
             background: rgba(15, 23, 42, 0.95);
-            color: white;
+            color: #f1f5f9;
             border-radius: 8px;
             border: 1px solid #334155;
             backdrop-filter: blur(10px);
@@ -394,10 +394,9 @@ export default function Component() {
     return "Suspicious Activity"
   }
 
-  // Add animated line with Worms-style drawing (stroke-dashoffset animation)
+  // Add animated line with Worms-style drawing (coordinate interpolation)
   const addAnimatedLineToMap = async (pulse: ThreatPulse) => {
     if (!mapRef.current || !mapLoaded) return
-
     try {
       const L = (await import("leaflet")).default
       const colorMap: Record<string, string> = {
@@ -408,53 +407,54 @@ export default function Component() {
       }
       const color = colorMap[pulse.severity]
 
-      // Create dotted polyline with dashed array
-      const latlngs = [
-        [pulse.source.lat, pulse.source.lng],
-        [pulse.target.lat, pulse.target.lng],
-      ]
+      const startLat = pulse.source.lat
+      const startLng = pulse.source.lng
+      const endLat = pulse.target.lat
+      const endLng = pulse.target.lng
 
-      const polyline = L.polyline(latlngs as any, {
+      // Start with a zero-length polyline
+      const polyline = L.polyline([[startLat, startLng], [startLat, startLng]], {
         color: color,
         weight: 2,
-        opacity: 0.75,
-        dashArray: "6, 10",
+        opacity: 0.85,
+        dashArray: "6, 8",
       }).addTo(mapRef.current)
 
-      // Get SVG element from polyline for animation
-      const path = polyline._path as SVGPathElement
+      const delay = pulse.severity === "Medium" || pulse.severity === "Low" ? 2000 : 0
+      const animDuration = 2000 // 2 seconds to draw
 
-      if (path) {
-        // Get path length for dashoffset animation
-        const length = path.getTotalLength()
+      setTimeout(() => {
+        const startTime = performance.now()
 
-        // Set initial dasharray and dashoffset (line is invisible)
-        path.style.strokeDasharray = length + " " + length
-        path.style.strokeDashoffset = String(length)
-        
-        // Apply CSS transition
-        path.style.transition = "stroke-dashoffset 1.5s ease-in-out"
+        const frame = (now: number) => {
+          const elapsed = now - startTime
+          const t = Math.min(elapsed / animDuration, 1)
+          // ease-in-out
+          const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
 
-        // Trigger animation by setting dashoffset to 0
-        requestAnimationFrame(() => {
-          path.style.strokeDashoffset = "0"
-        })
+          const currentLat = startLat + (endLat - startLat) * eased
+          const currentLng = startLng + (endLng - startLng) * eased
 
-        // Remove line after animation completes
-        const animationDelay = pulse.severity === "Medium" || pulse.severity === "Low" ? 3500 : 1500
-        setTimeout(
-          () => {
-            if (mapRef.current) {
-              try {
-                mapRef.current.removeLayer(polyline)
-              } catch (e) {
-                // Already removed
+          polyline.setLatLngs([
+            [startLat, startLng],
+            [currentLat, currentLng],
+          ])
+
+          if (t < 1) {
+            requestAnimationFrame(frame)
+          } else {
+            // Line fully drawn — remove immediately
+            setTimeout(() => {
+              if (mapRef.current) {
+                try { mapRef.current.removeLayer(polyline) } catch (e) {}
               }
-            }
-          },
-          animationDelay,
-        )
-      }
+            }, 200)
+          }
+        }
+
+        requestAnimationFrame(frame)
+      }, delay)
+
     } catch (error) {
       console.error("Error adding animated line to map:", error)
     }
@@ -504,7 +504,7 @@ export default function Component() {
       // Bind popup with threat details
       movingMarker.bindPopup(
         `
-        <div style="color: #000; font-family: system-ui; min-width: 200px;">
+        <div style="font-family: system-ui; min-width: 200px;">
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
             <span style="
               background: ${color}; 
@@ -519,14 +519,14 @@ export default function Component() {
           <div style="margin-bottom: 8px;">
             <strong>${ping.pulse.name}</strong>
           </div>
-          <div style="font-size: 12px; color: #666; margin-bottom: 8px;">
+          <div style="font-size: 12px; color: #94a3b8; margin-bottom: 8px;">
             ${ping.pulse.description.substring(0, 100)}...
           </div>
-          <div style="font-size: 11px; color: #888;">
-            <div><strong>From:</strong> ${ping.pulse.source.city}, ${ping.pulse.source.country}</div>
-            <div><strong>To:</strong> ${ping.pulse.target.city}, ${ping.pulse.target.country}</div>
-            <div><strong>Indicators:</strong> ${ping.pulse.indicators}</div>
-            <div><strong>Author:</strong> ${ping.pulse.author}</div>
+          <div style="font-size: 11px; color: #64748b;">
+            <div><span style="color: #94a3b8; font-weight: 600;">From:</span> ${ping.pulse.source.city}, ${ping.pulse.source.country}</div>
+            <div><span style="color: #94a3b8; font-weight: 600;">To:</span> ${ping.pulse.target.city}, ${ping.pulse.target.country}</div>
+            <div><span style="color: #94a3b8; font-weight: 600;">Indicators:</span> ${ping.pulse.indicators}</div>
+            <div><span style="color: #94a3b8; font-weight: 600;">Author:</span> ${ping.pulse.author}</div>
           </div>
         </div>
       `,
